@@ -139,7 +139,7 @@ Find `ItemId` in response JSON.
 
 ## 🔗 Related Projects
 
-- [Eagle to Jellyfin Tag Sync](../EagleTagToJellyfin) - Sync tags from Eagle to Jellyfin NFO
+- [Eagle to Jellyfin Tag Sync](https://github.com/Herselfta/EagleTagToJellyfin) - Sync tags from Eagle to Jellyfin NFO
 
 ## 📊 Requirements
 
