@@ -1,0 +1,16 @@
+# Windows
+desktop.ini
+Thumbs.db
+*.ico
+
+# Backups
+*.bak
+*.backup
+*~
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp

@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Jellyfin 筛选">
+    <meta name="theme-color" content="#000000">
+    <title>Jellyfin 标签筛选器</title>
+    <link rel="manifest" href="tag_filter_manifest.json">
+    <style>
+        :root {
+            /* Jellyfin 主题色 */
+            --primary-color: #00a4dc;
+            --bg-color: #101010;
+            --card-bg: #181818;
+            --text-primary: #ffffff;
+            --text-secondary: #999999;
+            --border-color: #303030;
+            --hover-bg: #252525;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg-color);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
+        /* 顶部导航栏 - Jellyfin 风格 */
+        .header {
+            background: rgba(0, 0, 0, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 16px;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo {
+            width: 28px;
+            height: 28px;
+            background: var(--primary-color);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .icon-btn {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: transparent;
+            color: var(--text-primary);
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            transition: background 0.2s;
+        }
+
+        .icon-btn:active {
+            background: var(--hover-bg);
+        }
+
+        /* 主容器 */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0;
+        }
+
+        .section {
+            padding: 16px;
+        }
+
+        /* 配置面板 - 可折叠 */
+        .config-panel {
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .config-panel.collapsed {
+            max-height: 0 !important;
+        }
+
+        .config-content {
+            padding: 16px;
+        }
+
+        .input-group {
+            margin-bottom: 16px;
+        }
+
+        .input-group:last-child {
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-size: 16px;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 16px;
+        }
+
+        .btn:active {
+            opacity: 0.8;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* 标签筛选区 */
+        .filter-section {
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .clear-btn {
+            background: none;
+            border: none;
+            color: var(--primary-color);
+            font-size: 14px;
+            padding: 4px 8px;
+            cursor: pointer;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            color: var(--text-primary);
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+
+        .tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 2px;
+        }
+
+        .tag {
+            padding: 6px 14px;
+            background: var(--hover-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            font-size: 13px;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .tag:active {
+            transform: scale(0.95);
+        }
+
+        .tag.selected {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+        }
+
+        .tag-count {
+            opacity: 0.6;
+            font-size: 11px;
+            margin-left: 4px;
+        }
+
+        /* 结果区域 */
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .result-count {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .view-toggle {
+            display: flex;
+            gap: 4px;
+            background: var(--hover-bg);
+            border-radius: 4px;
+            padding: 2px;
+        }
+
+        .view-toggle button {
+            padding: 6px 12px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 13px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .view-toggle button.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        /* 网格视图 */
+        .media-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+            gap: 12px;
+        }
+
+        .media-item {
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .media-item:active {
+            transform: scale(0.95);
+        }
+
+        .media-poster {
+            width: 100%;
+            aspect-ratio: 2/3;
+            background: var(--hover-bg);
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .media-poster img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .media-poster-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            background: linear-gradient(135deg, #1e1e1e, #2a2a2a);
+        }
+
+        .media-title {
+            font-size: 13px;
+            margin-top: 6px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            line-height: 1.3;
+        }
+
+        /* 列表视图 */
+        .media-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .media-list .media-item {
+            display: flex;
+            gap: 12px;
+            background: var(--card-bg);
+            border-radius: 6px;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .media-list .media-poster {
+            width: 80px;
+            height: 120px;
+            flex-shrink: 0;
+        }
+
+        .media-list .media-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .media-list .media-title {
+            font-size: 15px;
+            margin-bottom: 6px;
+        }
+
+        .media-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 6px;
+        }
+
+        .media-tag {
+            padding: 2px 8px;
+            background: var(--hover-bg);
+            border-radius: 10px;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        /* 消息提示 */
+        .message {
+            padding: 12px 16px;
+            margin: 16px;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .message.error {
+            background: #3a1a1a;
+            color: #ff6b6b;
+            border: 1px solid #6b2020;
+        }
+
+        .message.success {
+            background: #1a3a2a;
+            color: #51cf66;
+            border: 1px solid #206b30;
+        }
+
+        .message.loading {
+            background: var(--card-bg);
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        /* 隐藏类 */
+        .hidden {
+            display: none !important;
+        }
+
+        /* 详情页覆盖层 */
+        .detail-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--bg-color);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+
+        .detail-overlay.show {
+            transform: translateX(0);
+        }
+
+        .detail-header {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            background: rgba(0, 0, 0, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .detail-back {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: transparent;
+            color: var(--text-primary);
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            margin-right: 12px;
+        }
+
+        .detail-back:active {
+            background: var(--hover-bg);
+        }
+
+        .detail-title {
+            font-size: 16px;
+            font-weight: 600;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .rotate-btn {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: transparent;
+            color: var(--text-primary);
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            margin-left: 8px;
+        }
+
+        .rotate-btn:active {
+            background: var(--hover-bg);
+        }
+
+        .rotate-btn.active {
+            color: var(--primary-color);
+        }
+
+        .detail-content {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Jellyfin 播放器 iframe */
+        .jellyfin-player {
+            width: 100%;
+            flex: 1;
+            border: none;
+            background: #000;
+        }
+
+        /* 全屏时自动调整 */
+        .detail-overlay:fullscreen,
+        .detail-overlay:-webkit-full-screen,
+        .detail-overlay:-moz-full-screen {
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .detail-overlay:fullscreen .detail-header,
+        .detail-overlay:-webkit-full-screen .detail-header,
+        .detail-overlay:-moz-full-screen .detail-header {
+            display: none;
+        }
+
+        .detail-overlay:fullscreen .detail-content,
+        .detail-overlay:-webkit-full-screen .detail-content,
+        .detail-overlay:-moz-full-screen .detail-content {
+            flex: 1;
+        }
+
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-color);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--hover-bg);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #404040;
+        }
+
+        @media (min-width: 768px) {
+            .media-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <div class="header">
+        <div class="header-title">
+            <div class="logo">🎬</div>
+            <span>标签筛选</span>
+        </div>
+        <div class="header-actions">
+            <button class="icon-btn" onclick="toggleConfig()" title="设置">⚙️</button>
+            <button class="icon-btn" onclick="refreshData()" title="刷新">🔄</button>
+        </div>
+    </div>
+
+    <!-- 配置面板 -->
+    <div class="config-panel collapsed" id="configPanel">
+        <div class="config-content">
+            <div class="input-group">
+                <label>服务器地址</label>
+                <input type="text" id="serverUrl" placeholder="http://localhost:8096">
+            </div>
+            <div class="input-group">
+                <label>API 密钥</label>
+                <input type="password" id="apiKey" placeholder="您的 API Key">
+            </div>
+            <div class="input-group">
+                <label>媒体库 ID</label>
+                <input type="text" id="libraryId" placeholder="媒体库 ID">
+            </div>
+            <button class="btn" onclick="loadData()">加载媒体库</button>
+        </div>
+    </div>
+
+    <div id="message"></div>
+
+    <div class="container">
+        <!-- 标签筛选 -->
+        <div class="filter-section section hidden" id="filterSection">
+            <div class="section-header">
+                <div class="section-title">选择标签（AND 逻辑）</div>
+                <button class="clear-btn" onclick="clearSelection()">清除</button>
+            </div>
+            <input type="text" class="search-input" id="tagSearch" placeholder="🔍 搜索标签..." oninput="filterTags()">
+            <div class="tags-container" id="tagsContainer"></div>
+        </div>
+
+        <!-- 结果展示 -->
+        <div class="section hidden" id="resultsSection">
+            <div class="results-header">
+                <div class="result-count" id="resultCount">0 个结果</div>
+                <div class="view-toggle">
+                    <button class="active" onclick="setView('grid')">网格</button>
+                    <button onclick="setView('list')">列表</button>
+                </div>
+            </div>
+            <div class="media-grid" id="resultsContainer"></div>
+        </div>
+    </div>
+
+    <!-- 详情页覆盖层 -->
+    <div class="detail-overlay" id="detailOverlay">
+        <div class="detail-header">
+            <button class="detail-back" onclick="closeDetail()">←</button>
+            <div class="detail-title" id="detailTitle">正在播放</div>
+            <button class="rotate-btn" id="rotateBtn" onclick="toggleRotation()" title="横竖屏切换">🔄</button>
+        </div>
+        <div class="detail-content">
+            <!-- 使用 Jellyfin 内置播放器 -->
+            <iframe class="jellyfin-player" id="jellyfinPlayer" allowfullscreen></iframe>
+        </div>
+    </div>
+
+    <script>
+        let allItems = [];
+        let allTags = new Map();
+        let selectedTags = new Set();
+        let currentView = 'grid';
+        let serverUrl = '';
+        let apiKey = '';
+        let libraryId = '';
+        let currentOrientation = 'auto'; // 'auto', 'landscape', 'portrait'
+
+        // 初始化
+        window.addEventListener('load', () => {
+            loadConfig();
+            // 如果已有配置，自动加载
+            if (serverUrl && apiKey && libraryId) {
+                loadData();
+            } else {
+                document.getElementById('configPanel').classList.remove('collapsed');
+            }
+        });
+
+        // 加载配置
+        function loadConfig() {
+            serverUrl = localStorage.getItem('jellyfin_server') || '';
+            apiKey = localStorage.getItem('jellyfin_api_key') || '';
+            libraryId = localStorage.getItem('jellyfin_library_id') || '';
+            
+            if (serverUrl) document.getElementById('serverUrl').value = serverUrl;
+            if (apiKey) document.getElementById('apiKey').value = apiKey;
+            if (libraryId) document.getElementById('libraryId').value = libraryId;
+        }
+
+        // 切换配置面板
+        function toggleConfig() {
+            const panel = document.getElementById('configPanel');
+            if (panel.classList.contains('collapsed')) {
+                panel.style.maxHeight = panel.scrollHeight + 'px';
+                panel.classList.remove('collapsed');
+            } else {
+                panel.style.maxHeight = '0';
+                setTimeout(() => panel.classList.add('collapsed'), 300);
+            }
+        }
+
+        // 加载数据
+        async function loadData() {
+            serverUrl = document.getElementById('serverUrl').value.trim();
+            apiKey = document.getElementById('apiKey').value.trim();
+            libraryId = document.getElementById('libraryId').value.trim();
+
+            if (!serverUrl || !apiKey || !libraryId) {
+                showMessage('请填写完整配置', 'error');
+                return;
+            }
+
+            localStorage.setItem('jellyfin_server', serverUrl);
+            localStorage.setItem('jellyfin_api_key', apiKey);
+            localStorage.setItem('jellyfin_library_id', libraryId);
+
+            try {
+                showMessage('正在加载...', 'loading');
+
+                const url = `${serverUrl}/Items?ParentId=${libraryId}&Recursive=true&Fields=Tags&IncludeItemTypes=Movie,Episode,Video&api_key=${apiKey}`;
+                const response = await fetch(url);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                allItems = data.Items || [];
+
+                // 统计标签
+                allTags.clear();
+                allItems.forEach(item => {
+                    if (item.Tags && Array.isArray(item.Tags)) {
+                        item.Tags.forEach(tag => {
+                            allTags.set(tag, (allTags.get(tag) || 0) + 1);
+                        });
+                    }
+                });
+
+                showMessage(`✅ 加载成功：${allItems.length} 个项目，${allTags.size} 个标签`, 'success');
+                
+                // 收起配置面板
+                const panel = document.getElementById('configPanel');
+                panel.style.maxHeight = '0';
+                setTimeout(() => panel.classList.add('collapsed'), 300);
+
+                // 显示筛选和结果
+                document.getElementById('filterSection').classList.remove('hidden');
+                document.getElementById('resultsSection').classList.remove('hidden');
+
+                renderTags();
+                filterResults();
+
+            } catch (error) {
+                console.error('加载失败:', error);
+                showMessage(`❌ ${error.message}`, 'error');
+            }
+        }
+
+        // 刷新数据
+        function refreshData() {
+            if (serverUrl && apiKey && libraryId) {
+                loadData();
+            }
+        }
+
+        // 渲染标签
+        function renderTags() {
+            const container = document.getElementById('tagsContainer');
+            container.innerHTML = '';
+
+            const sortedTags = Array.from(allTags.entries())
+                .sort((a, b) => b[1] - a[1]);
+
+            sortedTags.forEach(([tag, count]) => {
+                const tagEl = document.createElement('div');
+                tagEl.className = 'tag';
+                if (selectedTags.has(tag)) {
+                    tagEl.classList.add('selected');
+                }
+                tagEl.innerHTML = `${tag}<span class="tag-count">${count}</span>`;
+                tagEl.dataset.tag = tag.toLowerCase();
+                tagEl.onclick = () => toggleTag(tag);
+                container.appendChild(tagEl);
+            });
+        }
+
+        // 筛选标签显示
+        function filterTags() {
+            const search = document.getElementById('tagSearch').value.toLowerCase();
+            const tags = document.querySelectorAll('.tag');
+            tags.forEach(tag => {
+                const match = tag.dataset.tag.includes(search);
+                tag.style.display = match ? '' : 'none';
+            });
+        }
+
+        // 切换标签选择
+        function toggleTag(tag) {
+            if (selectedTags.has(tag)) {
+                selectedTags.delete(tag);
+            } else {
+                selectedTags.add(tag);
+            }
+            renderTags();
+            filterResults();
+        }
+
+        // 清除选择
+        function clearSelection() {
+            selectedTags.clear();
+            renderTags();
+            filterResults();
+        }
+
+        // 筛选结果
+        function filterResults() {
+            let filteredItems = allItems;
+
+            if (selectedTags.size > 0) {
+                filteredItems = allItems.filter(item => {
+                    if (!item.Tags || !Array.isArray(item.Tags)) return false;
+                    const itemTags = new Set(item.Tags);
+                    return Array.from(selectedTags).every(tag => itemTags.has(tag));
+                });
+            }
+
+            const countText = selectedTags.size > 0 
+                ? `${filteredItems.length} 个结果 (已选 ${selectedTags.size} 个标签)`
+                : `${filteredItems.length} 个结果`;
+            document.getElementById('resultCount').textContent = countText;
+
+            renderResults(filteredItems);
+        }
+
+        // 渲染结果
+        function renderResults(items) {
+            const container = document.getElementById('resultsContainer');
+            container.innerHTML = '';
+            container.className = currentView === 'grid' ? 'media-grid' : 'media-list';
+
+            if (items.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div><div>没有找到匹配的媒体</div></div>';
+                return;
+            }
+
+            items.forEach(item => {
+                const itemEl = document.createElement('div');
+                itemEl.className = 'media-item';
+                itemEl.onclick = () => openInJellyfin(item.Id);
+
+                const posterUrl = item.ImageTags?.Primary 
+                    ? `${serverUrl}/Items/${item.Id}/Images/Primary?api_key=${apiKey}&maxWidth=300`
+                    : '';
+
+                const tagsHtml = (item.Tags || [])
+                    .map(tag => `<span class="media-tag">${tag}</span>`)
+                    .join('');
+
+                itemEl.innerHTML = `
+                    <div class="media-poster">
+                        ${posterUrl 
+                            ? `<img src="${posterUrl}" alt="${item.Name}" loading="lazy">`
+                            : `<div class="media-poster-placeholder">🎬</div>`
+                        }
+                    </div>
+                    <div class="media-info">
+                        <div class="media-title">${item.Name || '未命名'}</div>
+                        ${tagsHtml && currentView === 'list' ? `<div class="media-tags">${tagsHtml}</div>` : ''}
+                    </div>
+                `;
+
+                container.appendChild(itemEl);
+            });
+        }
+
+        // 切换视图
+        function setView(view) {
+            currentView = view;
+            const buttons = document.querySelectorAll('.view-toggle button');
+            buttons.forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            filterResults();
+        }
+
+        // 在当前页面内打开详情（使用 Jellyfin 播放器）
+        function openInJellyfin(itemId) {
+            const item = allItems.find(i => i.Id === itemId);
+            if (!item) return;
+            
+            // 更新标题
+            document.getElementById('detailTitle').textContent = item.Name || '正在播放';
+            
+            // 使用 Jellyfin 的详情页面（点击播放按钮开始播放）
+            const playUrl = `${serverUrl}/web/index.html#!/details?id=${itemId}`;
+            const iframe = document.getElementById('jellyfinPlayer');
+            iframe.src = playUrl;
+            
+            // 显示详情覆盖层
+            const overlay = document.getElementById('detailOverlay');
+            setTimeout(() => overlay.classList.add('show'), 10);
+            
+            // 设置全屏自动横屏
+            setupAutoRotation();
+        }
+
+        // 设置自动横屏功能
+        function setupAutoRotation() {
+            // 监听全屏变化
+            document.addEventListener('fullscreenchange', handleFullscreenChange);
+            document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+            document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+        }
+
+        // 处理全屏变化
+        function handleFullscreenChange() {
+            const rotateBtn = document.getElementById('rotateBtn');
+            
+            if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement) {
+                // 进入全屏 - 根据当前设置锁定方向
+                rotateBtn.style.display = 'flex'; // 全屏时显示旋转按钮
+                
+                if (currentOrientation !== 'auto' && screen.orientation && screen.orientation.lock) {
+                    const orientation = currentOrientation === 'landscape' ? 'landscape' : 'portrait';
+                    screen.orientation.lock(orientation).catch(err => {
+                        console.log('无法锁定屏幕方向:', err);
+                    });
+                }
+            } else {
+                // 退出全屏 - 解锁方向
+                rotateBtn.style.display = 'flex'; // 非全屏也显示
+                
+                if (screen.orientation && screen.orientation.unlock) {
+                    try {
+                        screen.orientation.unlock();
+                    } catch (err) {
+                        console.log('无法解锁屏幕方向:', err);
+                    }
+                }
+                currentOrientation = 'auto';
+                updateRotateButton();
+            }
+        }
+
+        // 切换旋转方向
+        function toggleRotation() {
+            if (!screen.orientation || !screen.orientation.lock) {
+                showMessage('您的浏览器不支持屏幕方向锁定', 'error');
+                return;
+            }
+
+            // 循环切换：auto → landscape → portrait → auto
+            if (currentOrientation === 'auto') {
+                currentOrientation = 'landscape';
+            } else if (currentOrientation === 'landscape') {
+                currentOrientation = 'portrait';
+            } else {
+                currentOrientation = 'auto';
+            }
+
+            updateRotateButton();
+            applyRotation();
+        }
+
+        // 更新旋转按钮状态
+        function updateRotateButton() {
+            const btn = document.getElementById('rotateBtn');
+            
+            if (currentOrientation === 'landscape') {
+                btn.textContent = '↔️'; // 横屏
+                btn.classList.add('active');
+                btn.title = '当前：横屏（点击切换）';
+            } else if (currentOrientation === 'portrait') {
+                btn.textContent = '↕️'; // 竖屏
+                btn.classList.add('active');
+                btn.title = '当前：竖屏（点击切换）';
+            } else {
+                btn.textContent = '🔄'; // 自动
+                btn.classList.remove('active');
+                btn.title = '当前：自动（点击切换）';
+            }
+        }
+
+        // 应用旋转设置
+        function applyRotation() {
+            if (!screen.orientation || !screen.orientation.lock) return;
+
+            if (currentOrientation === 'auto') {
+                // 解锁，恢复自动
+                screen.orientation.unlock();
+                showMessage('✅ 已切换为自动方向', 'success');
+            } else {
+                // 锁定到指定方向
+                const orientation = currentOrientation;
+                screen.orientation.lock(orientation).then(() => {
+                    const msg = orientation === 'landscape' ? '✅ 已锁定横屏' : '✅ 已锁定竖屏';
+                    showMessage(msg, 'success');
+                }).catch(err => {
+                    console.log('锁定失败:', err);
+                    showMessage('⚠️ 锁定失败，请进入全屏后再试', 'error');
+                });
+            }
+        }
+
+        // 关闭详情页
+        function closeDetail() {
+            // 如果在全屏，先退出全屏
+            if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement) {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                } else if (document.mozCancelFullScreen) {
+                    document.mozCancelFullScreen();
+                }
+            }
+            
+            // 解锁屏幕方向
+            if (screen.orientation && screen.orientation.unlock) {
+                try {
+                    screen.orientation.unlock();
+                } catch (err) {}
+            }
+            
+            const overlay = document.getElementById('detailOverlay');
+            overlay.classList.remove('show');
+            
+            // 清空 iframe
+            setTimeout(() => {
+                document.getElementById('jellyfinPlayer').src = 'about:blank';
+            }, 300);
+        }
+
+        // 显示消息
+        function showMessage(text, type) {
+            const msgEl = document.getElementById('message');
+            msgEl.className = `message ${type}`;
+            
+            if (type === 'loading') {
+                msgEl.innerHTML = `<div class="spinner"></div>${text}`;
+            } else {
+                msgEl.textContent = text;
+            }
+
+            if (type !== 'loading') {
+                setTimeout(() => {
+                    msgEl.className = '';
+                    msgEl.textContent = '';
+                }, 3000);
+            }
+        }
+    </script>
+</body>
+</html>
+
