@@ -2,15 +2,33 @@
 desktop.ini
 Thumbs.db
 *.ico
+*.lnk
+*.ico
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Logs
+*.log
+logs/
 
 # Backups
 *.bak
 *.backup
 *~
 
-# Logs
-*.log
-
-# Temporary files
+# Temporary
 *.tmp
 *.temp
+.cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# User-specific config (if created)
+config.local.json
