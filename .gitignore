@@ -32,3 +32,9 @@ logs/
 
 # User-specific config (if created)
 config.local.json
+
+# Deploy version tracking
+.deploy_version
+
+# Generated shortcut files
+jellyfin_shortcut_*.txt

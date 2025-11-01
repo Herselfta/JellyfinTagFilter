@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-title" content="Jellyfin 筛选">
     <meta name="theme-color" content="#000000">
     <title>Jellyfin 标签筛选器</title>
-    <link rel="manifest" href="tag_filter_manifest.json">
+    <link rel="manifest" href="/web/tag_filter_manifest.json">
     <style>
         :root {
             /* Jellyfin 主题色 */
@@ -613,6 +613,20 @@
                 <input type="text" id="libraryId" placeholder="媒体库 ID">
             </div>
             <button class="btn" onclick="loadData()">加载媒体库</button>
+            
+            <!-- 配置管理按钮 -->
+            <div style="display: flex; gap: 8px; margin-top: 12px;">
+                <button class="btn" style="background: #2d2d2d; flex: 1;" onclick="exportConfig()">📋 分享链接</button>
+                <button class="btn" style="background: #2d2d2d; flex: 1;" onclick="exportConfigFile()">💾 导出</button>
+                <button class="btn" style="background: #2d2d2d; flex: 1;" onclick="importConfigFile()">📂 导入</button>
+            </div>
+            
+            <div style="margin-top: 16px; padding: 12px; background: rgba(0, 164, 220, 0.1); border-radius: 4px; font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
+                💡 <strong>持久化提示：</strong><br>
+                • <strong>分享链接</strong>：生成带配置的URL，保存后直接访问<br>
+                • <strong>导出/导入</strong>：保存配置文件到本地，可在其他设备使用<br>
+                • <strong>添加到主屏幕</strong>：像原生应用一样使用，无需重复配置
+            </div>
         </div>
     </div>
 
@@ -667,24 +681,147 @@
 
         // 初始化
         window.addEventListener('load', () => {
-            loadConfig();
+            // 动态更新 manifest 的 start_url 为当前完整URL
+            updateManifestUrl();
+            
+            loadConfigFromURL(); // 先尝试从URL加载
+            loadConfig(); // 再从localStorage加载
+            
             // 如果已有配置，自动加载
             if (serverUrl && apiKey && libraryId) {
                 loadData();
+                showInstallPrompt(); // 显示PWA安装提示
             } else {
                 document.getElementById('configPanel').classList.remove('collapsed');
             }
         });
 
+        // 动态更新 manifest 的 start_url
+        function updateManifestUrl() {
+            // 获取当前页面的完整 URL
+            const currentUrl = window.location.href.split('?')[0]; // 去掉参数
+            
+            // 创建新的 manifest 对象
+            const manifest = {
+                "name": "Jellyfin 标签筛选器",
+                "short_name": "标签筛选",
+                "description": "Jellyfin AND 逻辑标签筛选工具",
+                "start_url": currentUrl,
+                "scope": currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1),
+                "display": "standalone",
+                "background_color": "#101010",
+                "theme_color": "#000000",
+                "orientation": "portrait-primary",
+                "icons": [
+                    {
+                        "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%2300a4dc' width='100' height='100' rx='20'/%3E%3Ctext x='50' y='70' font-size='60' text-anchor='middle' fill='white'%3E🎬%3C/text%3E%3C/svg%3E",
+                        "sizes": "512x512",
+                        "type": "image/svg+xml",
+                        "purpose": "any maskable"
+                    }
+                ],
+                "categories": ["entertainment", "utilities"],
+                "lang": "zh-CN"
+            };
+            
+            // 创建 Blob URL
+            const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+            const manifestUrl = URL.createObjectURL(manifestBlob);
+            
+            // 更新 manifest 链接
+            const manifestLink = document.querySelector('link[rel="manifest"]');
+            if (manifestLink) {
+                manifestLink.href = manifestUrl;
+            }
+        }
+
+        // 从URL参数加载配置
+        function loadConfigFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            const urlServer = params.get('server');
+            const urlApiKey = params.get('key');
+            const urlLibraryId = params.get('library');
+            
+            // 如果URL中有配置，自动保存到localStorage
+            if (urlServer) {
+                serverUrl = urlServer;
+                localStorage.setItem('jellyfin_server', serverUrl);
+            }
+            if (urlApiKey) {
+                apiKey = urlApiKey;
+                localStorage.setItem('jellyfin_api_key', apiKey);
+            }
+            if (urlLibraryId) {
+                libraryId = urlLibraryId;
+                localStorage.setItem('jellyfin_library_id', libraryId);
+            }
+            
+            // 如果URL中有完整配置，清理URL（防止API Key暴露在地址栏）
+            if (urlServer || urlApiKey || urlLibraryId) {
+                const cleanUrl = window.location.origin + window.location.pathname;
+                window.history.replaceState({}, document.title, cleanUrl);
+            }
+        }
+
         // 加载配置
         function loadConfig() {
-            serverUrl = localStorage.getItem('jellyfin_server') || '';
-            apiKey = localStorage.getItem('jellyfin_api_key') || '';
-            libraryId = localStorage.getItem('jellyfin_library_id') || '';
+            // 只在没有从URL加载时才从localStorage加载
+            if (!serverUrl) serverUrl = localStorage.getItem('jellyfin_server') || '';
+            if (!apiKey) apiKey = localStorage.getItem('jellyfin_api_key') || '';
+            if (!libraryId) libraryId = localStorage.getItem('jellyfin_library_id') || '';
             
             if (serverUrl) document.getElementById('serverUrl').value = serverUrl;
             if (apiKey) document.getElementById('apiKey').value = apiKey;
             if (libraryId) document.getElementById('libraryId').value = libraryId;
+        }
+
+        // PWA安装提示
+        let deferredPrompt;
+        let installShown = localStorage.getItem('install_prompt_shown') === 'true';
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+        });
+
+        function showInstallPrompt() {
+            if (installShown) return;
+            
+            // 检测是否已经是PWA环境
+            const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
+                              || window.navigator.standalone 
+                              || document.referrer.includes('android-app://');
+            
+            if (isStandalone) return;
+            
+            // 首次使用时显示安装提示
+            setTimeout(() => {
+                if (confirm('💡 提示：将此页面添加到主屏幕，即可像原生应用一样使用，无需每次都重新访问！\n\n点击确定查看操作指南')) {
+                    showInstallGuide();
+                }
+                installShown = true;
+                localStorage.setItem('install_prompt_shown', 'true');
+            }, 2000);
+        }
+
+        function showInstallGuide() {
+            const guide = `
+📱 添加到主屏幕：
+
+iOS (Safari):
+1. 点击底部 [分享] 按钮 
+2. 选择 [添加到主屏幕]
+3. 点击 [添加]
+
+Android (Chrome):
+1. 点击右上角 [⋮] 菜单
+2. 选择 [添加到主屏幕]
+3. 点击 [添加]
+
+添加后，从主屏幕打开即可直接使用！
+            `.trim();
+            
+            alert(guide);
         }
 
         // 切换配置面板
@@ -697,6 +834,99 @@
                 panel.style.maxHeight = '0';
                 setTimeout(() => panel.classList.add('collapsed'), 300);
             }
+        }
+
+        // 导出配置
+        function exportConfig() {
+            const config = {
+                server: serverUrl,
+                apiKey: apiKey,
+                libraryId: libraryId
+            };
+            
+            // 生成带配置的URL
+            const baseUrl = window.location.origin + window.location.pathname;
+            const configUrl = `${baseUrl}?server=${encodeURIComponent(serverUrl)}&key=${encodeURIComponent(apiKey)}&library=${encodeURIComponent(libraryId)}`;
+            
+            // 复制到剪贴板
+            navigator.clipboard.writeText(configUrl).then(() => {
+                showMessage('✅ 配置链接已复制到剪贴板！保存此链接可在任何设备上快速访问', 'success');
+                
+                // 同时显示链接
+                setTimeout(() => {
+                    alert(`📋 配置链接已复制！\n\n${configUrl}\n\n保存此链接到：\n• 浏览器书签\n• 备忘录\n• 发送到其他设备\n\n下次直接打开链接即可自动配置！`);
+                }, 500);
+            }).catch(() => {
+                // 如果复制失败，直接显示链接
+                prompt('📋 复制此链接保存使用：', configUrl);
+            });
+        }
+
+        // 导出配置为JSON文件
+        function exportConfigFile() {
+            const config = {
+                server: serverUrl,
+                apiKey: apiKey,
+                libraryId: libraryId,
+                exportDate: new Date().toISOString()
+            };
+            
+            const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'jellyfin_tag_filter_config.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showMessage('✅ 配置文件已下载', 'success');
+        }
+
+        // 导入配置文件
+        function importConfigFile() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'application/json';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const config = JSON.parse(event.target.result);
+                        
+                        if (config.server) {
+                            serverUrl = config.server;
+                            localStorage.setItem('jellyfin_server', serverUrl);
+                            document.getElementById('serverUrl').value = serverUrl;
+                        }
+                        if (config.apiKey) {
+                            apiKey = config.apiKey;
+                            localStorage.setItem('jellyfin_api_key', apiKey);
+                            document.getElementById('apiKey').value = apiKey;
+                        }
+                        if (config.libraryId) {
+                            libraryId = config.libraryId;
+                            localStorage.setItem('jellyfin_library_id', libraryId);
+                            document.getElementById('libraryId').value = libraryId;
+                        }
+                        
+                        showMessage('✅ 配置已导入', 'success');
+                        
+                        // 自动加载数据
+                        if (serverUrl && apiKey && libraryId) {
+                            setTimeout(() => loadData(), 1000);
+                        }
+                    } catch (error) {
+                        showMessage('❌ 配置文件格式错误', 'error');
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
         }
 
         // 加载数据
